@@ -18,9 +18,10 @@ import DraggableFlatList, {
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { haversineDistanceKm, formatDistanceKm } from '@/app/utils/geo';
-import { Milestone, OptimizedRoute } from '@/app/utils/types';
+import { Milestone } from '@/app/utils/types';
 import { optimizeRoute } from '@/app/utils/routeOptimization';
 import { ScrollView } from 'react-native-gesture-handler';
+import { useRouter } from 'expo-router';
 
 type PlacePrediction = {
   place_id: string;
@@ -38,6 +39,7 @@ type PlaceDetails = {
 const DURATION_OPTIONS = [15, 30, 60, 120];
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [query, setQuery] = React.useState('');
   const [predictions, setPredictions] = React.useState<PlacePrediction[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -48,7 +50,6 @@ export default function HomeScreen() {
     longitude: number;
   } | null>(null);
   const [useTwoOpt, setUseTwoOpt] = React.useState<boolean>(false);
-  const [optimized, setOptimized] = React.useState<OptimizedRoute | null>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -129,6 +130,7 @@ export default function HomeScreen() {
       };
       const next = [...milestones, newMilestone];
       setMilestones(next);
+      setQuery("")
       if (startingPointId == null) {
         setStartingPointId(newMilestone.id);
       }
@@ -157,12 +159,10 @@ export default function HomeScreen() {
   const onDragEnd = React.useCallback(({ data }: { data: Milestone[] }) => {
     const reordered = data.map((m, idx) => ({ ...m, order: idx }));
     setMilestones(reordered);
-    setOptimized(null);
   }, []);
 
   const selectAsStart = React.useCallback((id: string) => {
     setStartingPointId(id);
-    setOptimized(null);
   }, []);
 
   // starting point derived in-line by id; no need to compute object here
@@ -253,9 +253,15 @@ export default function HomeScreen() {
       userLocation,
       useTwoOpt,
     });
-    setOptimized(result);
-    setMilestones(result.milestones);
-  }, [canProceed, milestones, startingPointId, useTwoOpt, userLocation]);
+    
+    // Navigate to route details screen with optimized route
+    router.push({
+      pathname: '/route-details' as any,
+      params: {
+        route: JSON.stringify(result),
+      },
+    });
+  }, [canProceed, milestones, startingPointId, useTwoOpt, userLocation, router]);
 
   return (
     <ScrollView style={{ padding: 12, marginTop: 12 }}>
@@ -275,7 +281,7 @@ export default function HomeScreen() {
             <Text style={{ marginLeft: 8 }}>Searching…</Text>
           </View>
         )}
-        {!loading && predictions.length > 0 && (
+        {query && !loading && predictions.length > 0 && (
           <FlatList
             data={predictions}
             keyExtractor={(p) => p.place_id}
@@ -306,24 +312,8 @@ export default function HomeScreen() {
           style={[styles.primaryButton, !canProceed && { opacity: 0.5 }]}
           onPress={onOptimize}
         >
-          <Text style={styles.primaryButtonText}>Optimize Order</Text>
+          <Text style={styles.primaryButtonText}>Optimize & Start Route</Text>
         </Pressable>
-
-        {optimized && (
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryTitle}>Route summary</Text>
-            <Text>Total distance: {optimized.totalDistance.toFixed(1)} km</Text>
-            <Text>Estimated total time: {Math.round(optimized.estimatedTotalTime)} min</Text>
-            {!optimized.validation.valid && (
-              <View style={{ marginTop: 6 }}>
-                <Text style={{ color: '#a00', fontWeight: '700' }}>Warnings:</Text>
-                {optimized.validation.reasons.map((r, i) => (
-                  <Text key={i} style={{ color: '#a00' }}>• {r}</Text>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
       </ThemedView>
     </ScrollView>
   );
@@ -497,18 +487,5 @@ const styles = StyleSheet.create({
     borderColor: '#1D3D47',
     color: 'white',
   },
-  summaryBox: {
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: 'white',
-    marginTop: 8,
-    gap: 4,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
+
 });

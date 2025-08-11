@@ -11,7 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We use your location to show distance to places and plan routes."
+        "NSLocationWhenInUseUsageDescription": "We use your location to show distance to places and plan routes.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to track your progress along the route.",
+        "NSLocationAlwaysUsageDescription": "We use your location in the background to track your progress along the route."
       }
     },
     "android": {
@@ -22,7 +24,8 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
       ]
     },
     "web": {
@@ -40,10 +43,24 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "We use your location in the background to track your progress along the route."
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "094b35f6-44f3-4da0-8d7c-20dbe0d5123f"
+      }
     }
   }
 }
