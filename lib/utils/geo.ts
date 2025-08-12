@@ -9,6 +9,13 @@ function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
 }
 
+//haversine formula
+// Δφ = φ₂ - φ₁ (difference in latitude)
+// Δλ = λ₂ - λ₁ (difference in longitude)
+// a = sin²(Δφ/2) + cosφ₁ * cosφ₂ * sin²(Δλ/2)
+// c = 2 * atan2(√a, √(1−a)) (angular distance in radians)
+// distance = R * c  (R ≈ 6371 km)
+
 export function haversineDistanceKm(a: LatLng, b: LatLng): number {
   const dLat = toRadians(b.latitude - a.latitude);
   const dLon = toRadians(b.longitude - a.longitude);

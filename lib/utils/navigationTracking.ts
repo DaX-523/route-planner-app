@@ -1,8 +1,9 @@
+// background tracking for android
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import { Linking, Platform } from 'react-native';
-import { Milestone } from '@/app/utils/types';
-import { haversineDistanceKm } from '@/app/utils/geo';
+import { Milestone } from '@/lib/utils/types';
+import { haversineDistanceKm } from '@/lib/utils/geo';
 
 export const LOCATION_TASK = 'ROUTE_TRACKING_LOCATION_TASK';
 

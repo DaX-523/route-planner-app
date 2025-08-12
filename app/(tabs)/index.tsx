@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -14,14 +15,15 @@ import {
 import DraggableFlatList, {
   RenderItemParams,
 } from 'react-native-draggable-flatlist';
+import { styles } from './index.styles';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { haversineDistanceKm, formatDistanceKm } from '@/app/utils/geo';
-import { Milestone } from '@/app/utils/types';
-import { optimizeRoute } from '@/app/utils/routeOptimization';
-import { ScrollView } from 'react-native-gesture-handler';
+import { haversineDistanceKm, formatDistanceKm } from '@/lib/utils/geo';
+import { Milestone } from '@/lib/utils/types';
+import { optimizeRoute } from '@/lib/utils/routeOptimization';
 import { useRouter } from 'expo-router';
+import { useRecentTrips } from '@/app/contexts/RecentTripsContext';
 
 type PlacePrediction = {
   place_id: string;
@@ -40,6 +42,7 @@ const DURATION_OPTIONS = [15, 30, 60, 120];
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { addRecentTrip } = useRecentTrips();
   const [query, setQuery] = React.useState('');
   const [predictions, setPredictions] = React.useState<PlacePrediction[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -50,6 +53,7 @@ export default function HomeScreen() {
     longitude: number;
   } | null>(null);
   const [useTwoOpt, setUseTwoOpt] = React.useState<boolean>(false);
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -69,10 +73,10 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  const fetchPredictions = React.useCallback(async (text: string) => {
-    setQuery(text);
+  const fetchPredictionsDebounced = React.useCallback(async (text: string) => {
     if (!text || text.length < 2) {
       setPredictions([]);
+      setLoading(false);
       return;
     }
     try {
@@ -94,6 +98,27 @@ export default function HomeScreen() {
     }
   }, [userLocation]);
 
+  const handleSearchInput = React.useCallback((text: string) => {
+    setQuery(text);
+    
+    // Clear existing debounce timer
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    
+    // Set loading state immediately if text is long enough
+    if (text && text.length >= 2) {
+      setLoading(true);
+    } else {
+      setLoading(false);
+    }
+    
+    // Debounce the API call by 300ms
+    debounceRef.current = setTimeout(() => {
+      fetchPredictionsDebounced(text);
+    }, 300);
+  }, [fetchPredictionsDebounced]);
+
   const getPlaceDetails = React.useCallback(async (placeId: string): Promise<PlaceDetails | null> => {
     try {
       const key = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
@@ -113,6 +138,11 @@ export default function HomeScreen() {
         Alert.alert('Limit reached', 'You can add up to 10 milestones per route.');
         return;
       }
+      
+      // Clear predictions immediately and dismiss keyboard
+      setPredictions([]);
+      Keyboard.dismiss();
+      
       const details = await getPlaceDetails(prediction.place_id);
       if (!details) return;
 
@@ -130,7 +160,7 @@ export default function HomeScreen() {
       };
       const next = [...milestones, newMilestone];
       setMilestones(next);
-      setQuery("")
+      setQuery("");
       if (startingPointId == null) {
         setStartingPointId(newMilestone.id);
       }
@@ -243,7 +273,7 @@ export default function HomeScreen() {
 
   const canProceed = milestones.length >= 3 && milestones.length <= 10 && startingPointId != null;
 
-  const onOptimize = React.useCallback(() => {
+  const onOptimize = React.useCallback(async () => {
     if (!canProceed) {
       Alert.alert('Add more milestones', 'Please add at least 3 milestones to continue.');
       return;
@@ -254,6 +284,13 @@ export default function HomeScreen() {
       useTwoOpt,
     });
     
+    // Save trip to recent trips
+    try {
+      addRecentTrip(result);
+    } catch (error) {
+      console.error('Error saving recent trip:', error);
+    }
+    
     // Navigate to route details screen with optimized route
     router.push({
       pathname: '/route-details' as any,
@@ -261,231 +298,64 @@ export default function HomeScreen() {
         route: JSON.stringify(result),
       },
     });
-  }, [canProceed, milestones, startingPointId, useTwoOpt, userLocation, router]);
+  }, [canProceed, milestones, startingPointId, useTwoOpt, userLocation, router, addRecentTrip]);
 
   return (
-    <ScrollView style={{ padding: 12, marginTop: 12 }}>
-      <ThemedView style={{ gap: 12, padding: 12 }}>
-        <ThemedText type="title">Plan your route</ThemedText>
-        <TextInput
-          value={query}
-          onChangeText={fetchPredictions}
-          placeholder="Search for places"
-          style={styles.searchInput}
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {loading && (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator />
-            <Text style={{ marginLeft: 8 }}>Searching…</Text>
-          </View>
-        )}
-        {query && !loading && predictions.length > 0 && (
+    <ThemedView style={{ flex: 1, padding: 12, marginTop: 12 }}>
+      <ThemedText type="title">Plan your route</ThemedText>
+      <TextInput
+        value={query}
+        onChangeText={handleSearchInput}
+        placeholder="Search for places"
+        style={[styles.searchInput, { marginTop: 12 }]}
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
+      {loading && (
+        <View style={[styles.loadingRow, { marginTop: 8 }]}>
+          <ActivityIndicator />
+          <Text style={{ marginLeft: 8 }}>Searching…</Text>
+        </View>
+      )}
+      {predictions.length > 0 && (
+        <View style={[styles.predictionList, { marginTop: 8 }]}>
           <FlatList
             data={predictions}
             keyExtractor={(p) => p.place_id}
             renderItem={renderPrediction}
-            keyboardShouldPersistTaps="handled"
-            style={styles.predictionList}
+            keyboardShouldPersistTaps="always"
+            showsVerticalScrollIndicator={false}
           />
-        )}
-
-        <ThemedText type="subtitle">Milestones ({milestones.length}/10)</ThemedText>
-        <View style={styles.optionsRow}>
-          
-          <Pressable onPress={() => setUseTwoOpt(v => !v)}>
-            <Text style={[styles.togglePill, useTwoOpt && styles.togglePillOn]}>2-opt</Text>
-          </Pressable>
         </View>
+      )}
+
+      <ThemedText type="subtitle" style={{ marginTop: 16 }}>Milestones ({milestones.length}/10)</ThemedText>
+      <View style={[styles.optionsRow, { marginTop: 8 }]}>
+        <Pressable onPress={() => setUseTwoOpt(v => !v)}>
+          <Text style={[styles.togglePill, useTwoOpt && styles.togglePillOn]}>2-opt</Text>
+        </Pressable>
+      </View>
+      
+      <View style={{ flex: 1, marginTop: 8 }}>
         <DraggableFlatList
           data={milestones}
           keyExtractor={(m) => m.id}
           renderItem={renderMilestone}
           onDragEnd={onDragEnd}
           activationDistance={12}
-          containerStyle={{ minHeight: 120 }}
+          containerStyle={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
         />
+      </View>
 
-        <Pressable
-          disabled={!canProceed}
-          style={[styles.primaryButton, !canProceed && { opacity: 0.5 }]}
-          onPress={onOptimize}
-        >
-          <Text style={styles.primaryButtonText}>Optimize & Start Route</Text>
-        </Pressable>
-      </ThemedView>
-    </ScrollView>
+      <Pressable
+        disabled={!canProceed}
+        style={[styles.primaryButton, !canProceed && { opacity: 0.5 }, { marginTop: 16 }]}
+        onPress={onOptimize}
+      >
+        <Text style={styles.primaryButtonText}>Optimize & Start Route</Text>
+      </Pressable>
+    </ThemedView>
   );
 }
 
-const styles = StyleSheet.create({
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.select({ ios: 12, android: 8, default: 10 }),
-    backgroundColor: 'white',
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  predictionList: {
-    maxHeight: 240,
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 8,
-  },
-  predictionItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: 'white',
-  },
-  predictionTitle: {
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  predictionSubtitle: {
-    color: '#666',
-    marginTop: 2,
-  },
-  milestoneItem: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  milestoneHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  milestoneTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  milestoneAddress: {
-    color: '#666',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  milestoneMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  durationRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  durationPill: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: 'white',
-  },
-  durationPillSelected: {
-    backgroundColor: '#1D3D47',
-    borderColor: '#1D3D47',
-  },
-  durationPillText: {
-    color: '#333',
-    fontWeight: '600',
-  },
-  durationPillTextSelected: {
-    color: 'white',
-  },
-  startBadge: {
-    borderWidth: 1,
-    borderColor: '#1D3D47',
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    color: '#1D3D47',
-  },
-  startBadgeSelected: {
-    backgroundColor: '#1D3D47',
-    color: 'white',
-  },
-  distanceText: {
-    color: '#333',
-  },
-  distanceTextSmall: {
-    color: '#666',
-    marginTop: 4,
-  },
-  milestoneActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  primaryButton: {
-    backgroundColor: '#1D3D47',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  removeText: {
-    color: '#a00',
-    fontWeight: '600',
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  modeRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  modePill: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    textTransform: 'capitalize',
-    color: '#333',
-  },
-  modePillSelected: {
-    backgroundColor: '#1D3D47',
-    borderColor: '#1D3D47',
-    color: 'white',
-  },
-  togglePill: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    color: '#333',
-  },
-  togglePillOn: {
-    backgroundColor: '#1D3D47',
-    borderColor: '#1D3D47',
-    color: 'white',
-  },
-
-});

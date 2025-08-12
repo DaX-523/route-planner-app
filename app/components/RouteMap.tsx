@@ -1,7 +1,7 @@
 import React from 'react';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Platform, StyleSheet, Text, View } from 'react-native';
-import { Milestone, RouteSegment } from '@/app/utils/types';
+import { Milestone, RouteSegment } from '@/lib/utils/types';
 
 export function RouteMap({
   milestones,
@@ -95,4 +95,4 @@ const styles = StyleSheet.create({
   },
 });
 
-
+export default RouteMap;

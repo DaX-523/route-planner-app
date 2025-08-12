@@ -1,4 +1,4 @@
-package com.anonymous.routeplanner
+package com.dax523.routeplanner
 
 import android.app.Application
 import android.content.res.Configuration

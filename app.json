@@ -14,7 +14,8 @@
         "NSLocationWhenInUseUsageDescription": "We use your location to show distance to places and plan routes.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to track your progress along the route.",
         "NSLocationAlwaysUsageDescription": "We use your location in the background to track your progress along the route."
-      }
+      },
+      "bundleIdentifier": "com.dax523.routeplanner"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,8 +26,15 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
-      ]
+        "ACCESS_BACKGROUND_LOCATION",
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ],
+      "package": "com.dax523.routeplanner"
     },
     "web": {
       "bundler": "metro",
@@ -50,6 +58,14 @@
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true,
           "locationAlwaysAndWhenInUsePermission": "We use your location in the background to track your progress along the route."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1D3D47",
+          "defaultChannel": "route-updates"
         }
       ]
     ],

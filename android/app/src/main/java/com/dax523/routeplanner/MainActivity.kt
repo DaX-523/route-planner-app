@@ -1,4 +1,4 @@
-package com.anonymous.routeplanner
+package com.dax523.routeplanner
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

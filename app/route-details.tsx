@@ -8,9 +8,9 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { RouteMap } from '@/app/components/RouteMap';
 import { Timeline } from '@/app/components/Timeline';
-import { buildTimeline } from '@/app/utils/schedule';
-import { startTracking, stopTracking } from '@/app/utils/navigationTracking';
-import { Milestone, OptimizedRoute } from '@/app/utils/types';
+import { buildTimeline } from '@/lib/utils/schedule';
+import { startTracking, stopTracking } from '@/lib/utils/navigationTracking';
+import { Milestone, OptimizedRoute } from '@/lib/utils/types';
 
 export default function RouteDetailsScreen() {
   const params = useLocalSearchParams();

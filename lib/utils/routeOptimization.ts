@@ -1,6 +1,7 @@
-import { haversineDistanceKm } from '@/app/utils/geo';
-import { Milestone, OptimizedRoute, RouteSegment, TransportMode, RouteValidationResult } from '@/app/utils/types';
+import { haversineDistanceKm } from '@/lib/utils/geo';
+import { Milestone, OptimizedRoute, RouteSegment, RouteValidationResult } from '@/lib/utils/types';
 
+// n x n matrix of distances between all points
 function computeDistanceMatrixKm(points: { latitude: number; longitude: number }[]): number[][] {
   const n = points.length;
   const matrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
@@ -36,20 +37,16 @@ function nearestNeighborOrder(distanceMatrix: number[][], startIndex: number): n
   return order;
 }
 
-// Helper kept for potential future UI breakdowns
-// function orderDistance(order: number[], distanceMatrix: number[][]): number {
-//   let total = 0;
-//   for (let i = 0; i < order.length - 1; i += 1) {
-//     total += distanceMatrix[order[i]][order[i + 1]];
-//   }
-//   return total;
-// }
 
 function twoOpt(order: number[], distanceMatrix: number[][]): number[] {
   let best = order.slice();
   let improved = true;
   while (improved) {
     improved = false;
+    // we start at 1 because we don't want to swap the first and last point
+    // we end at length - 2 because we don't want to swap the last and first point
+    // we don't want to swap the first and last point because it would create a loop
+ 
     for (let i = 1; i < best.length - 2; i += 1) {
       for (let k = i + 1; k < best.length - 1; k += 1) {
         const a = best[i - 1];
@@ -58,6 +55,7 @@ function twoOpt(order: number[], distanceMatrix: number[][]): number[] {
         const d = best[k + 1];
         const current = distanceMatrix[a][b] + distanceMatrix[c][d];
         const swapped = distanceMatrix[a][c] + distanceMatrix[b][d];
+        // If swapped is less than current by more than 1 nanometer (since 1e-9 km ≈ 1 micron), treat it as an improvement.
         if (swapped + 1e-9 < current) {
           const newOrder = best.slice(0, i)
             .concat(best.slice(i, k + 1).reverse())
@@ -71,22 +69,10 @@ function twoOpt(order: number[], distanceMatrix: number[][]): number[] {
   return best;
 }
 
-function speedKmPerHourForMode(mode: TransportMode): number {
-  switch (mode) {
-    case 'walking':
-      return 5; // avg walking speed
-    case 'cycling':
-      return 15; // avg city cycling
-    case 'driving':
-      return 40; // conservative city driving avg
-    default:
-      return 5;
-  }
-}
 
-function buildSegmentsFromOrder(order: number[], points: Milestone[], mode: TransportMode): RouteSegment[] {
+function buildSegmentsFromOrder(order: number[], points: Milestone[]): RouteSegment[] {
   const segments: RouteSegment[] = [];
-  const speedKmPerHour = speedKmPerHourForMode(mode);
+  const speedKmPerHour = 40; // conservative city driving avg
   for (let i = 0; i < order.length - 1; i += 1) {
     const from = points[order[i]];
     const to = points[order[i + 1]];
@@ -112,17 +98,10 @@ export function suggestStartingPointIndex(milestones: Milestone[], userLocation?
   return bestIdx;
 }
 
-export function validateRouteWalkable(segments: RouteSegment[], mode: TransportMode): RouteValidationResult {
+export function validateRouteAccesible(segments: RouteSegment[]): RouteValidationResult {
   const reasons: string[] = [];
   let valid = true;
-  if (mode === 'walking') {
-    for (const seg of segments) {
-      if (seg.distanceKm > 10) {
-        valid = false;
-        reasons.push(`Segment from "${seg.from.name}" to "${seg.to.name}" is too long for walking (${seg.distanceKm.toFixed(1)} km).`);
-      }
-    }
-  }
+  
   // Basic coordinate sanity check
   for (const seg of segments) {
     const { latitude: la1, longitude: lo1 } = seg.from.coordinates;
@@ -144,7 +123,6 @@ export function optimizeRoute(
     startId?: string | null;
     userLocation?: { latitude: number; longitude: number } | null;
     useTwoOpt?: boolean;
-    mode?: TransportMode;
   } = {},
 ): OptimizedRoute {
   if (milestones.length < 2) {
@@ -158,7 +136,6 @@ export function optimizeRoute(
     };
   }
 
-  const mode: TransportMode = options.mode ?? 'driving';
   const startIndex = options.startId
     ? Math.max(0, milestones.findIndex(m => m.id === options.startId))
     : suggestStartingPointIndex(milestones, options.userLocation ?? null);
@@ -171,14 +148,14 @@ export function optimizeRoute(
     order = twoOpt(order, distMatrix);
   }
 
-  const segments = buildSegmentsFromOrder(order, milestones, mode);
+  const segments = buildSegmentsFromOrder(order, milestones);
   const totalDistance = segments.reduce((acc, s) => acc + s.distanceKm, 0);
   const travelTimeMinutes = segments.reduce((acc, s) => acc + s.travelTimeMinutes, 0);
   const visitTimeMinutes = milestones.reduce((acc, m) => acc + m.estimatedDuration, 0);
 
   const orderedMilestones = order.map((idx, i) => ({ ...milestones[idx], order: i }));
 
-  const validation = validateRouteWalkable(segments, mode);
+  const validation = validateRouteAccesible(segments);
 
   return {
     milestones: orderedMilestones,

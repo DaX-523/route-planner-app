@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.routeplanner'
+    namespace 'com.dax523.routeplanner'
     defaultConfig {
-        applicationId 'com.anonymous.routeplanner'
+        applicationId 'com.dax523.routeplanner'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

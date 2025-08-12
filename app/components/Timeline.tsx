@@ -1,6 +1,6 @@
 import React from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Milestone } from '@/app/utils/types';
+import { Milestone } from '@/lib/utils/types';
 
 export interface TimelineItemData {
   milestone: Milestone;
@@ -93,4 +93,4 @@ const styles = StyleSheet.create({
   subtle: { color: '#666', marginTop: 4 },
 });
 
-
+export default Timeline;

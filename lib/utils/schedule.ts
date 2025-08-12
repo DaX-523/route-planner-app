@@ -1,4 +1,4 @@
-import { Milestone, RouteSegment } from '@/app/utils/types';
+import { Milestone, RouteSegment } from '@/lib/utils/types';
 
 export interface TimelineEntry {
   milestone: Milestone;
